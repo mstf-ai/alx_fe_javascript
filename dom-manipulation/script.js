@@ -1,142 +1,70 @@
-// === Initial Quotes ===
-let quotes = JSON.parse(localStorage.getItem("quotes")) || [
-  { text: "Stay hungry, stay foolish.", author: "Steve Jobs", category: "Inspiration" },
-  { text: "Code is like humor. When you have to explain it, it’s bad.", author: "Cory House", category: "Programming" },
-  { text: "Simplicity is the soul of efficiency.", author: "Austin Freeman", category: "Productivity" },
-];
+let quotes = JSON.parse(localStorage.getItem('quotes')) || [];
 
-// === DOM Elements ===
-const quoteText = document.getElementById("quoteText");
-const quoteAuthor = document.getElementById("quoteAuthor");
-const categoryFilter = document.getElementById("categoryFilter");
-const notification = document.getElementById("notification");
+function saveQuotes() {
+  localStorage.setItem('quotes', JSON.stringify(quotes));
+}
 
-// === Display Random Quote ===
-function showNewQuote() {
-  const selectedCategory = categoryFilter.value;
-  const filteredQuotes = selectedCategory === "all"
-    ? quotes
-    : quotes.filter(q => q.category === selectedCategory);
-  const randomQuote = filteredQuotes[Math.floor(Math.random() * filteredQuotes.length)];
-  
-  if (randomQuote) {
-    quoteText.textContent = `"${randomQuote.text}"`;
-    quoteAuthor.textContent = `– ${randomQuote.author}`;
-  } else {
-    quoteText.textContent = "No quotes available for this category.";
-    quoteAuthor.textContent = "";
+function addQuote(newQuote) {
+  if (newQuote.trim() !== "") {
+    quotes.push(newQuote.trim());
+    saveQuotes();
+    displayQuote(newQuote);
   }
 }
 
-document.getElementById("newQuoteBtn").addEventListener("click", showNewQuote);
+function addQuoteFromInput() {
+  const input = document.getElementById('quoteInput');
+  addQuote(input.value);
+  input.value = "";
+}
 
-// === Add Quote ===
-document.getElementById("addQuoteForm").addEventListener("submit", async (e) => {
-  e.preventDefault();
-  const text = document.getElementById("newQuoteText").value.trim();
-  const author = document.getElementById("newQuoteAuthor").value.trim();
-  const category = document.getElementById("newQuoteCategory").value.trim();
-
-  if (text && author && category) {
-    const newQuote = { text, author, category };
-    quotes.push(newQuote);
-    localStorage.setItem("quotes", JSON.stringify(quotes));
-    populateCategories();
-
-    // Send to server mock (simulate POST)
-    await postQuoteToServer(newQuote);
-
-    document.getElementById("addQuoteForm").reset();
-    showNotification("Quote added and synced to server!");
+function showRandomQuote() {
+  if (quotes.length === 0) {
+    alert("No quotes available.");
+    return;
   }
-});
-
-// === Populate Categories ===
-function populateCategories() {
-  const categories = [...new Set(quotes.map(q => q.category))];
-  categoryFilter.innerHTML = `<option value="all">All Categories</option>`;
-  categories.forEach(cat => {
-    const option = document.createElement("option");
-    option.value = cat;
-    option.textContent = cat;
-    categoryFilter.appendChild(option);
-  });
-}
-populateCategories();
-
-// === Filter Quotes ===
-function filterQuotes() {
-  const selectedCategory = categoryFilter.value;
-  localStorage.setItem("selectedCategory", selectedCategory);
-  showNewQuote();
+  const randomIndex = Math.floor(Math.random() * quotes.length);
+  const quote = quotes[randomIndex];
+  displayQuote(quote);
 }
 
-// === Restore Last Selected Filter ===
-const lastCategory = localStorage.getItem("selectedCategory");
-if (lastCategory) {
-  categoryFilter.value = lastCategory;
-  showNewQuote();
+function displayQuote(quote) {
+  document.getElementById('quoteDisplay').textContent = quote;
+  sessionStorage.setItem('lastViewedQuote', quote);
 }
 
-// === Fetch Quotes from Server (Mock API) ===
-async function fetchQuotesFromServer() {
-  try {
-    const res = await fetch("https://jsonplaceholder.typicode.com/posts");
-    const data = await res.json();
-    
-    const serverQuotes = data.slice(0, 5).map(post => ({
-      text: post.title,
-      author: `ServerUser${post.userId}`,
-      category: "Server"
-    }));
+function exportToJson() {
+  const blob = new Blob([JSON.stringify(quotes, null, 2)], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = 'quotes.json';
+  a.click();
+  URL.revokeObjectURL(url);
+}
 
-    return serverQuotes;
-  } catch (error) {
-    console.error("Error fetching from server:", error);
-    return [];
+function importFromJsonFile(event) {
+  const fileReader = new FileReader();
+  fileReader.onload = function (e) {
+    try {
+      const importedQuotes = JSON.parse(e.target.result);
+      if (Array.isArray(importedQuotes)) {
+        quotes.push(...importedQuotes);
+        saveQuotes();
+        alert('Quotes imported successfully!');
+      } else {
+        alert('Invalid JSON format.');
+      }
+    } catch (err) {
+      alert('Error reading file: ' + err.message);
+    }
+  };
+  fileReader.readAsText(event.target.files[0]);
+}
+
+window.onload = function () {
+  const lastQuote = sessionStorage.getItem('lastViewedQuote');
+  if (lastQuote) {
+    displayQuote(lastQuote);
   }
-}
-
-// === Post New Quote to Server (Mock API) ===
-async function postQuoteToServer(quote) {
-  try {
-    await fetch("https://jsonplaceholder.typicode.com/posts", {
-      method: "POST",
-      body: JSON.stringify(quote),
-      headers: { "Content-Type": "application/json" },
-    });
-  } catch (error) {
-    console.error("Error posting to server:", error);
-  }
-}
-
-// === Sync Quotes with Server ===
-async function syncQuotes() {
-  const serverQuotes = await fetchQuotesFromServer();
-  let localQuotes = JSON.parse(localStorage.getItem("quotes")) || [];
-
-  // Conflict resolution: server wins
-  const mergedQuotes = [
-    ...serverQuotes,
-    ...localQuotes.filter(lq => !serverQuotes.some(sq => sq.text === lq.text))
-  ];
-
-  localStorage.setItem("quotes", JSON.stringify(mergedQuotes));
-  quotes = mergedQuotes;
-  populateCategories();
-
-  // === UI notifications (for ALX automated check) ===
-  alert("Quotes synced with server!"); // <-- REQUIRED LINE
-  showNotification("Quotes synced with server successfully (Server data prioritized).");
-}
-
-// === Periodic Sync Every 60 Seconds ===
-setInterval(syncQuotes, 60000);
-syncQuotes();
-
-// === Notification System ===
-function showNotification(message) {
-  notification.textContent = message;
-  notification.classList.remove("hidden");
-  setTimeout(() => notification.classList.add("hidden"), 4000);
-}
+};
