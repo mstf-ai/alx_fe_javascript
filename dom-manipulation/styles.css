@@ -13,7 +13,7 @@ body {
   padding: 40px;
 }
 
-/* Quote display area */
+/* Quote display */
 .quote-display {
   background: #ffffff;
   border-radius: 8px;
@@ -52,8 +52,8 @@ input {
   border: 1px solid #ccc;
 }
 
-/* Section for adding quotes */
-.add-quote-section {
+/* Form container */
+#formContainer {
   margin-top: 40px;
 }
 
